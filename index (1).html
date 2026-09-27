@@ -117,9 +117,9 @@
     <div id="tab-url" class="tab-content active">
         <div class="form-group">
             <label for="m3uUrl">Lien URL du fichier M3U :</label>
-            <input type="text" id="m3uUrl" placeholder="https://exemple.com/playlist.m3u">
+            <input type="text" id="m3uUrl" placeholder="https://exemple.com">
         </div>
-        <button class="btn" onclick="processFromUrl()">Télécharger et Vérifier</button>
+        <button class="btn" onclick="processFromUrl()">Vérifier le lien et charger les chaînes</button>
     </div>
 
     <!-- Onglet 2 : Upload -->
@@ -128,7 +128,7 @@
             <label for="m3uFile">Choisir un fichier .m3u local :</label>
             <input type="file" id="m3uFile" accept=".m3u,.m3u8">
         </div>
-        <button class="btn" onclick="processFromFile()">Analyseur et Vérifier</button>
+        <button class="btn" onclick="processFromFile()">Analyser et Vérifier</button>
     </div>
 
     <!-- Statistiques Dashboard -->
@@ -151,13 +151,13 @@
         </div>
     </div>
 
-    <!-- Bouton Téléchargement -->
+    <!-- Bouton Téléchargement Séparé -->
     <button id="downloadBtn" class="btn btn-download" onclick="downloadValidM3U()">📥 Télécharger la playlist nettoyée (Uniquement en ligne)</button>
 
     <!-- Outils de recherche et Filtres -->
     <div class="controls-container" id="controlsContainer" style="display:none;">
         <div class="search-box">
-            <input type="text" id="searchBar" onkeyup="filterResults()" placeholder="🔍 Rechercher une chaîne par son nom...">
+            <input type="text" id="searchBar" onkeyup="filterResults()" placeholder="🔍 Filtrer les chaînes par nom...">
         </div>
         <div class="filter-box">
             <select id="statusFilter" onchange="filterResults()">
@@ -198,159 +198,18 @@
         async function processFromUrl() {
             const url = document.getElementById('m3uUrl').value.trim();
             if (!url) return alert("Veuillez saisir une URL valide.");
+            
             try {
+                // Étape 1 : Vérification de l'accessibilité du lien M3U
                 const response = await fetch(url);
                 if (!response.ok) throw new Error();
                 const text = await response.text();
+                
+                // Étape 2 : Chargement si ok
                 parseAndTestM3U(text);
             } catch {
-                alert("Erreur de récupération. Si le serveur bloque le CORS, téléchargez le fichier manuellement et utilisez l'onglet 'Fichier Local'.");
+                alert("Impossible d'accéder au fichier M3U distant. Vérifiez l'URL ou utilisez l'onglet 'Fichier Local' si le serveur d'hébergement bloque le navigateur (CORS).");
             }
         }
 
         function processFromFile() {
-            const fileInput = document.getElementById('m3uFile');
-            if (!fileInput.files || fileInput.files.length === 0) return alert("Veuillez sélectionner un fichier.");
-            const reader = new FileReader();
-            reader.onload = e => parseAndTestM3U(e.target.result);
-            reader.readAsText(fileInput.files[0]);
-        }
-
-        function parseAndTestM3U(content) {
-            const lines = content.split('\n');
-            globalChannels = [];
-            let currentInfo = "";
-
-            for (let i = 0; i < lines.length; i++) {
-                let line = lines[i].trim();
-                if (line.startsWith('#EXTINF:')) {
-                    currentInfo = line;
-                } else if (line.startsWith('http://') || line.startsWith('https://')) {
-                    let displayName = "Chaîne inconnue";
-                    if (currentInfo) {
-                        const commaIndex = currentInfo.lastIndexOf(',');
-                        if (commaIndex !== -1) displayName = currentInfo.substring(commaIndex + 1).trim();
-                    }
-                    globalChannels.push({ 
-                        name: displayName, 
-                        url: line, 
-                        infoLine: currentInfo || `#EXTINF:-1,${displayName}`,
-                        status: 'checking' 
-                    });
-                    currentInfo = "";
-                }
-            }
-
-            if (globalChannels.length === 0) return alert("Aucun canal vidéo valide trouvé.");
-            
-            document.getElementById('searchBar').value = '';
-            document.getElementById('statusFilter').value = 'all';
-            
-            displayTable();
-        }
-
-        function updateCounters() {
-            const total = globalChannels.length;
-            const online = globalChannels.filter(c => c.status === 'online').length;
-            const offline = globalChannels.filter(c => c.status === 'offline').length;
-            const checking = globalChannels.filter(c => c.status === 'checking').length;
-
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statOnline').textContent = online;
-            document.getElementById('statOffline').textContent = offline;
-            document.getElementById('statChecking').textContent = checking;
-        }
-
-        function displayTable() {
-            const tbody = document.getElementById('resultsBody');
-            tbody.innerHTML = '';
-            document.getElementById('tableContainer').style.display = 'block';
-            document.getElementById('controlsContainer').style.display = 'flex';
-            document.getElementById('statsContainer').style.display = 'grid';
-            document.getElementById('downloadBtn').style.display = 'none';
-
-            updateCounters();
-
-            globalChannels.forEach((channel, index) => {
-                const row = document.createElement('tr');
-                row.id = `row-${index}`;
-                
-                const nameCell = document.createElement('td');
-                nameCell.textContent = channel.name;
-                row.appendChild(nameCell);
-
-                const urlCell = document.createElement('td');
-                urlCell.style.color = '#64748b';
-                urlCell.textContent = channel.url.length > 60 ? channel.url.substring(0, 60) + '...' : channel.url;
-                row.appendChild(urlCell);
-
-                const statusCell = document.createElement('td');
-                const badge = document.createElement('span');
-                badge.className = 'status-badge checking';
-                badge.textContent = 'En attente';
-                badge.id = `badge-${index}`;
-                statusCell.appendChild(badge);
-                row.appendChild(statusCell);
-
-                tbody.appendChild(row);
-                testStreamUrl(channel.url, index);
-            });
-        }
-
-        async function testStreamUrl(url, index) {
-            const badge = document.getElementById(`badge-${index}`);
-            if(!badge) return;
-            
-            try {
-                await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-                badge.textContent = 'En ligne';
-                badge.className = 'status-badge online';
-                globalChannels[index].status = 'online';
-            } catch {
-                badge.textContent = 'Hors ligne';
-                badge.className = 'status-badge offline';
-                globalChannels[index].status = 'offline';
-            }
-            
-            document.getElementById('downloadBtn').style.display = 'block';
-            updateCounters();
-            filterResults(); 
-        }
-
-        function filterResults() {
-            const query = document.getElementById('searchBar').value.toLowerCase();
-            const filterValue = document.getElementById('statusFilter').value;
-
-            globalChannels.forEach((channel, index) => {
-                const row = document.getElementById(`row-${index}`);
-                if (!row) return;
-
-                const matchesSearch = channel.name.toLowerCase().includes(query);
-                const matchesStatus = (filterValue === 'all') || (channel.status === filterValue);
-
-                if (matchesSearch && matchesStatus) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        }
-
-        function downloadValidM3U() {
-            const validChannels = globalChannels.filter(c => c.status === 'online');
-            if (validChannels.length === 0) return alert("Aucune chaîne en ligne détectée.");
-
-            let m3uContent = "#EXTM3U\n";
-            validChannels.forEach(c => m3uContent += c.infoLine + "\n" + c.url + "\n");
-
-            const blob = new Blob([m3uContent], { type: 'text/plain' });
-            const element = document.createElement('a');
-            element.href = URL.createObjectURL(blob);
-            element.download = "playlist_nettoyee.m3u";
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
-        }
-    </script>
-</body>
-</html>
