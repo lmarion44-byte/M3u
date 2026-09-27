@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vérificateur de Playlist M3U Pro</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #16a34a;
+            --success-hover: #15803d;
+            --danger: #dc2626;
+            --warning: #ca8a04;
+            --dark: #1f2937;
+            --light: #f8fafc;
+            --border: #e5e7eb;
+        }
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            max-width: 1000px; 
+            margin: 30px auto; 
+            padding: 0 20px; 
+            background-color: var(--light); 
+            color: var(--dark); 
+        }
+        h1 { text-align: center; color: var(--dark); margin-bottom: 25px; font-weight: 800; }
+        
+        /* Onglets */
+        .tabs { display: flex; gap: 4px; margin-bottom: 0; }
+        .tab-btn { 
+            flex: 1; padding: 14px; background: #e2e8f0; border: none; cursor: pointer; 
+            font-size: 15px; font-weight: 600; transition: all 0.2s; border-radius: 8px 8px 0 0; 
+            color: #64748b;
+        }
+        .tab-btn:hover { background: #cbd5e1; }
+        .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 -2px 10px rgba(0,0,0,0.05); border-top: 3px solid var(--primary); }
+        
+        .tab-content { 
+            display: none; background: white; padding: 25px; border-radius: 0 0 8px 8px; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border); border-top: none;
+        }
+        .tab-content.active { display: block; }
+
+        /* Formulaires */
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; color: #4b5563; }
+        input[type="text"], input[type="file"] { 
+            width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; 
+            box-sizing: border-box; font-size: 15px; background: #f9fafb; transition: 0.2s;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        
+        /* Boutons */
+        .btn { 
+            background-color: var(--primary); color: white; border: none; padding: 12px 24px; 
+            cursor: pointer; font-size: 15px; border-radius: 6px; width: 100%; font-weight: 600; 
+            transition: background-color 0.2s; text-align: center;
+        }
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn-download { background-color: var(--success); margin-top: 15px; display: none; font-size: 16px; }
+        .btn-download:hover { background-color: var(--success-hover); }
+
+        /* Stats Dashboard */
+        .stats-container {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px;
+        }
+        .stat-card {
+            background: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border);
+            text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .stat-card .num { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+        .stat-card .label { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+
+        /* Zone de Recherche et Filtres */
+        .controls-container {
+            display: flex; gap: 15px; margin-top: 20px; padding: 15px; 
+            background: white; border-radius: 8px; border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); align-items: center;
+        }
+        .search-box { flex: 2; }
+        .filter-box { flex: 1; }
+        .controls-container select {
+            width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 15px; background-color: white; cursor: pointer;
+        }
+
+        /* Tableau */
+        .table-container { 
+            margin-top: 15px; background: white; border-radius: 8px; 
+            border: 1px solid var(--border); overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+        }
+        .result-table { width: 100%; border-collapse: collapse; }
+        .result-table th, .result-table td { padding: 14px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+        .result-table th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+        .result-table tr:last-child td { border-bottom: none; }
+        .result-table tr:hover { background-color: #f8fafc; }
+        
+        /* Statuts badges */
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .online { background-color: #dcfce7; color: var(--success); }
+        .offline { background-color: #fee2e2; color: var(--danger); }
+        .checking { background-color: #fef9c3; color: var(--warning); }
+    </style>
+</head>
+<body>
+
+    <h1>Validateur & Analyseur M3U Pro</h1>
+
+    <!-- Onglets -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab(event, 'tab-url')">🌐 Lien URL</button>
+        <button class="tab-btn" onclick="openTab(event, 'tab-file')">📂 Fichier Local</button>
+    </div>
+
+    <!-- Onglet 1 : Lien M3U -->
+    <div id="tab-url" class="tab-content active">
+        <div class="form-group">
+            <label for="m3uUrl">Lien URL du fichier M3U :</label>
+            <input type="text" id="m3uUrl" placeholder="https://exemple.com/playlist.m3u">
+        </div>
+        <button class="btn" onclick="processFromUrl()">Télécharger et Vérifier</button>
+    </div>
+
+    <!-- Onglet 2 : Upload -->
+    <div id="tab-file" class="tab-content">
+        <div class="form-group">
+            <label for="m3uFile">Choisir un fichier .m3u local :</label>
+            <input type="file" id="m3uFile" accept=".m3u,.m3u8">
+        </div>
+        <button class="btn" onclick="processFromFile()">Analyseur et Vérifier</button>
+    </div>
+
+    <!-- Statistiques Dashboard -->
+    <div class="stats-container" id="statsContainer" style="display:none;">
+        <div class="stat-card" style="border-left: 4px solid var(--dark);">
+            <div class="num" id="statTotal" style="color: var(--dark);">0</div>
+            <div class="label">Total</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid var(--success);">
+            <div class="num" id="statOnline" style="color: var(--success);">0</div>
+            <div class="label">En Ligne</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid var(--danger);">
+            <div class="num" id="statOffline" style="color: var(--danger);">0</div>
+            <div class="label">Hors Ligne</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid var(--warning);">
+            <div class="num" id="statChecking" style="color: var(--warning);">0</div>
+            <div class="label">En cours</div>
+        </div>
+    </div>
+
+    <!-- Bouton Téléchargement -->
+    <button id="downloadBtn" class="btn btn-download" onclick="downloadValidM3U()">📥 Télécharger la playlist nettoyée (Uniquement en ligne)</button>
+
+    <!-- Outils de recherche et Filtres -->
+    <div class="controls-container" id="controlsContainer" style="display:none;">
+        <div class="search-box">
+            <input type="text" id="searchBar" onkeyup="filterResults()" placeholder="🔍 Rechercher une chaîne par son nom...">
+        </div>
+        <div class="filter-box">
+            <select id="statusFilter" onchange="filterResults()">
+                <option value="all">Tous les statuts</option>
+                <option value="online">🟢 En ligne</option>
+                <option value="offline">🔴 Hors ligne</option>
+                <option value="checking">🟡 En cours...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Tableau de résultats -->
+    <div class="table-container" id="tableContainer" style="display:none;">
+        <table class="result-table">
+            <thead>
+                <tr>
+                    <th>Nom de la chaîne</th>
+                    <th>Lien / URL du flux</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        let globalChannels = [];
+
+        function openTab(evt, tabId) {
+            const contents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < contents.length; i++) contents[i].className = contents[i].className.replace(" active", "");
+            const buttons = document.getElementsByClassName("tab-btn");
+            for (let i = 0; i < buttons.length; i++) buttons[i].className = buttons[i].className.replace(" active", "");
+            document.getElementById(tabId).className += " active";
+            evt.currentTarget.className += " active";
+        }
+
+        async function processFromUrl() {
+            const url = document.getElementById('m3uUrl').value.trim();
+            if (!url) return alert("Veuillez saisir une URL valide.");
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error();
+                const text = await response.text();
+                parseAndTestM3U(text);
+            } catch {
+                alert("Erreur de récupération. Si le serveur bloque le CORS, téléchargez le fichier manuellement et utilisez l'onglet 'Fichier Local'.");
+            }
+        }
+
+        function processFromFile() {
+            const fileInput = document.getElementById('m3uFile');
+            if (!fileInput.files || fileInput.files.length === 0) return alert("Veuillez sélectionner un fichier.");
+            const reader = new FileReader();
+            reader.onload = e => parseAndTestM3U(e.target.result);
+            reader.readAsText(fileInput.files[0]);
+        }
+
+        function parseAndTestM3U(content) {
+            const lines = content.split('\n');
+            globalChannels = [];
+            let currentInfo = "";
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (line.startsWith('#EXTINF:')) {
+                    currentInfo = line;
+                } else if (line.startsWith('http://') || line.startsWith('https://')) {
+                    let displayName = "Chaîne inconnue";
+                    if (currentInfo) {
+                        const commaIndex = currentInfo.lastIndexOf(',');
+                        if (commaIndex !== -1) displayName = currentInfo.substring(commaIndex + 1).trim();
+                    }
+                    globalChannels.push({ 
+                        name: displayName, 
+                        url: line, 
+                        infoLine: currentInfo || `#EXTINF:-1,${displayName}`,
+                        status: 'checking' 
+                    });
+                    currentInfo = "";
+                }
+            }
+
+            if (globalChannels.length === 0) return alert("Aucun canal vidéo valide trouvé.");
+            
+            document.getElementById('searchBar').value = '';
+            document.getElementById('statusFilter').value = 'all';
+            
+            displayTable();
+        }
+
+        function updateCounters() {
+            const total = globalChannels.length;
+            const online = globalChannels.filter(c => c.status === 'online').length;
+            const offline = globalChannels.filter(c => c.status === 'offline').length;
+            const checking = globalChannels.filter(c => c.status === 'checking').length;
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statOnline').textContent = online;
+            document.getElementById('statOffline').textContent = offline;
+            document.getElementById('statChecking').textContent = checking;
+        }
+
+        function displayTable() {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+            document.getElementById('tableContainer').style.display = 'block';
+            document.getElementById('controlsContainer').style.display = 'flex';
+            document.getElementById('statsContainer').style.display = 'grid';
+            document.getElementById('downloadBtn').style.display = 'none';
+
+            updateCounters();
+
+            globalChannels.forEach((channel, index) => {
+                const row = document.createElement('tr');
+                row.id = `row-${index}`;
+                
+                const nameCell = document.createElement('td');
+                nameCell.textContent = channel.name;
+                row.appendChild(nameCell);
+
+                const urlCell = document.createElement('td');
+                urlCell.style.color = '#64748b';
+                urlCell.textContent = channel.url.length > 60 ? channel.url.substring(0, 60) + '...' : channel.url;
+                row.appendChild(urlCell);
+
+                const statusCell = document.createElement('td');
+                const badge = document.createElement('span');
+                badge.className = 'status-badge checking';
+                badge.textContent = 'En attente';
+                badge.id = `badge-${index}`;
+                statusCell.appendChild(badge);
+                row.appendChild(statusCell);
+
+                tbody.appendChild(row);
+                testStreamUrl(channel.url, index);
+            });
+        }
+
+        async function testStreamUrl(url, index) {
+            const badge = document.getElementById(`badge-${index}`);
+            if(!badge) return;
+            
+            try {
+                await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+                badge.textContent = 'En ligne';
+                badge.className = 'status-badge online';
+                globalChannels[index].status = 'online';
+            } catch {
+                badge.textContent = 'Hors ligne';
+                badge.className = 'status-badge offline';
+                globalChannels[index].status = 'offline';
+            }
+            
+            document.getElementById('downloadBtn').style.display = 'block';
+            updateCounters();
+            filterResults(); 
+        }
+
+        function filterResults() {
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            const filterValue = document.getElementById('statusFilter').value;
+
+            globalChannels.forEach((channel, index) => {
+                const row = document.getElementById(`row-${index}`);
+                if (!row) return;
+
+                const matchesSearch = channel.name.toLowerCase().includes(query);
+                const matchesStatus = (filterValue === 'all') || (channel.status === filterValue);
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function downloadValidM3U() {
+            const validChannels = globalChannels.filter(c => c.status === 'online');
+            if (validChannels.length === 0) return alert("Aucune chaîne en ligne détectée.");
+
+            let m3uContent = "#EXTM3U\n";
+            validChannels.forEach(c => m3uContent += c.infoLine + "\n" + c.url + "\n");
+
+            const blob = new Blob([m3uContent], { type: 'text/plain' });
+            const element = document.createElement('a');
+            element.href = URL.createObjectURL(blob);
+            element.download = "playlist_nettoyee.m3u";
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+    </script>
+</body>
+</html>
