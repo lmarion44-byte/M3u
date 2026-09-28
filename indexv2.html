@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M3U Control Center</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --surface: #0e1116;
+      --surface-2: #161b22;
+      --surface-3: #21262d;
+      --text: #f0f4f8;
+      --text-2: #c9d1d9;
+      --muted: #8b949e;
+      --border: #30363d;
+      --divider: #21262d;
+      --brand: #f59e0b;
+      --brand-dark: #78350f;
+      --success: #238636;
+      --error: #da3633;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .24);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+
+    .shell { min-height: 100vh; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(14, 17, 22, .94);
+      padding: 18px max(20px, calc((100vw - 1120px) / 2));
+      backdrop-filter: blur(14px);
+    }
+
+    .brand-lockup { display: flex; align-items: center; gap: 12px; }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid #9a5d08;
+      border-radius: 12px;
+      background: var(--brand-dark);
+      color: var(--brand);
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+    }
+
+    .brand-name { margin: 4px 0 0; font-size: 17px; font-weight: 800; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .6px;
+    }
+
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+    .dot.active { background: var(--success); }
+
+    .container { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 72px; }
+
+    .hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+
+    h1 {
+      max-width: 720px;
+      margin: 8px 0 10px;
+      font-size: clamp(32px, 6vw, 58px);
+      line-height: 1;
+      letter-spacing: -2px;
+    }
+
+    .subhead { max-width: 650px; margin: 0; color: var(--muted); line-height: 1.6; }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface-2);
+      box-shadow: var(--shadow);
+    }
+
+    .input-card { padding: 20px; margin-bottom: 20px; }
+
+    .section-label {
+      margin: 0 0 11px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1.2px;
+    }
+
+    .input-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .input-shell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: var(--surface-3);
+      padding: 0 14px;
+      flex: 1;
+      min-width: 260px;
+    }
+
+    input, select { width: 100%; border: 0; outline: 0; background: transparent; }
+    input::placeholder { color: var(--muted); }
+
+    .primary, .secondary, .action-btn {
+      min-height: 52px;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      padding: 0 24px;
+      font-weight: 900;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .primary { background: var(--brand); color: #0e1116; }
+    .secondary {
+      border-color: var(--border);
+      background: var(--surface-3);
+      color: var(--text-2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .secondary input[type="file"] {
+      position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+    }
+
+    .action-btn { min-height: 38px; padding: 0 14px; font-size: 12px; border-color: var(--border); background: var(--surface-3); }
+
+    .primary:hover, .secondary:hover, .action-btn:hover { filter: brightness(1.08); }
+
+    .helper { margin: 12px 2px 0; color: var(--muted); font-size: 12px; }
+
+    .message {
+      display: none;
+      margin-top: 16px;
+      border: 1px solid var(--error);
+      border-radius: 13px;
+      background: rgba(218, 54, 51, .12);
+      padding: 14px;
+      color: #ffaaa6;
+    }
+    .message.show { display: block; }
+
+    .loading { display: none; margin-top: 16px; padding: 17px; text-align: center; color: var(--brand); font-weight: 700; }
+    .loading.show { display: block; }
+
+    .spinner {
+      display: inline-block; width: 20px; height: 20px; margin-right: 8px;
+      border: 2px solid var(--border); border-top-color: var(--brand);
+      border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .dashboard { display: none; margin-top: 22px; }
+    .dashboard.show { display: block; }
+
+    .valid-header {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+      padding: 15px; border: 1px solid var(--success); border-radius: 15px; background: rgba(35, 134, 54, .12);
+    }
+    .valid-info { display: flex; align-items: center; gap: 13px; }
+    .valid-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 10px; background: var(--success); font-weight: 900; }
+    .valid-title { margin: 0 0 4px; font-weight: 900; }
+    .valid-sub { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 16px 0; }
+    .metric { padding: 15px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface-2); }
+    .metric-label { color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .8px; }
+    .metric-value { margin-top: 9px; font-size: 24px; font-weight: 900; }
+    .metric-value.success { color: #4bd46a; }
+
+    .checker-progress {
+      display: none; padding: 12px 16px; margin: 12px 0; border: 1px solid var(--border);
+      border-radius: 12px; background: var(--surface-3); font-size: 13px;
+    }
+    .checker-progress.show { display: block; }
+    .progress-bar-bg { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .progress-bar-fill { width: 0%; height: 100%; background: var(--brand); transition: width 0.2s ease; }
+
+    .filter-row { display: flex; gap: 10px; margin: 20px 0 12px; flex-wrap: wrap; }
+    .filter-row .input-shell { min-height: 44px; }
+    .filter-row select { height: 100%; padding: 0 10px; color: var(--text-2); background: var(--surface-3); }
+
+    .table-container { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    th { background: var(--surface-3); color: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+
+    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; }
+    .status-badge.pending { background: var(--surface-3); color: var(--muted); }
+    .status-badge.ok { background: rgba(35, 134, 54, 0.2); color: #4bd46a; }
+    .status-badge.nok { background: rgba(218, 54, 51, 0.2); color: #ff8a86; }
+    .status-badge.cors { background: rgba(245, 158, 11, 0.2); color: var(--brand); }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand-lockup">
+        <div class="brand-mark">M3U</div>
+        <div>
+          <p class="eyebrow">CONTROL CENTER</p>
+          <h2 class="brand-name">Parser & Checker Pro</h2>
+        </div>
+      </div>
+      <div class="status-pill">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-text">Aucun fichier chargé</span>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="view active">
+        <div class="hero">
+          <div>
+            <h1>Analyseur IPTV</h1>
+            <p class="subhead">Validez vos listes de lecture M3U. Utilisez l'importation de fichier local pour contourner les blocages réseau.</p>
+          </div>
+        </div>
+
+        <div class="input-card card">
+          <div class="section-label">CHARGER UNE PLAYLIST M3U</div>
+          <div class="input-row">
+            <div class="input-shell">
+              <span class="input-icon">🔗</span>
+              <input type="url" id="m3u-url" placeholder="https://exemple.com/playlist.m3u" />
+            </div>
+            <div class="secondary">
+              <span>📁 Choisir un fichier</span>
+              <input type="file" id="m3u-file" accept=".m3u,.m3u8" />
+            </div>
+            <button class="primary" id="btn-load">Analyser l'URL</button>
+          </div>
+          <div class="helper">💡 Astuce : En cas d'erreur réseau sur l'URL, téléchargez le fichier manuellement puis chargez-le ici.</div>
+        </div>
+
+        <div class="message" id="error-message"></div>
+        <div class="loading" id="loading-spinner"><div class="spinner"></div> Analyse en cours...</div>
+
+        <div class="dashboard" id="dashboard-view">
+          <div class="valid-header">
+            <div class="valid-info">
+              <div class="valid-icon">✓</div>
+              <div class="valid-copy">
+                <p class="valid-title">Structure M3U valide</p>
+                <p class="valid-sub" id="loaded-source-name"></p>
+              </div>
+            </div>
+            <button class="primary" id="btn-check-all" style="min-height:40px; font-size:13px;">⚡ Tout vérifier en 1 clic</button>
+          </div>
+
+          <div class="checker-progress" id="checker-ui">
+            <div style="display:flex; justify-content:space-between; font-weight:700;">
+              <span id="checker-status-text">Vérification en cours...</span>
+              <button id="btn-cancel-check" style="background:transparent; border:0; color:var(--error); font-weight:800; padding:0;">[Annuler]</button>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-bar-fill" id="checker-progress-bar"></div></div>
+            <div style="display:flex; gap:15px; margin-top:10px; font-size:12px; font-weight:800;">
+              <span style="color:#4bd46a;">🟢 OK: <span id="count-ok">0</span></span>
+              <span style="color:#ff8a86;">🔴 NOK: <span id="count-nok">0</span></span>
+              <span style="color:var(--brand);">🟡 CORS: <span id="count-cors">0</span></span>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <div class="metric"><div class="metric-label">TOTAL ÉLÉMENTS</div><div class="metric-value success" id="metric-total">0</div></div>
+            <div class="metric"><div class="metric-label">CHAÎNES LIVE</div><div class="metric-value" id="metric-live">0</div></div>
+            <div class="metric"><div class="metric-label">FILMS & SÉRIES (VOD)</div><div class="metric-value" id="metric-vod">0</div></div>
+            <div class="metric"><div class="metric-label">GROUPES</div><div class="metric-value" id="metric-groups">0</div></div>
+          </div>
+
+          <div class="filter-row">
+            <div class="input-shell" style="flex:2; min-width:200px;">
+              <span class="input-icon">🔍</span>
+              <input type="text" id="search-input" placeholder="Rechercher une chaîne..." />
+            </div>
+            <div class="input-shell" style="flex:1; min-width:150px; padding:0;">
+              <select id="group-filter"><option value="">Toutes les catégories</option></select>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom de la chaîne</th>
+                  <th>Catégorie / Groupe</th>
+                  <th>Statut du flux</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="channels-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let channelsData = [];
+    let activeCheckingBatch = false;
+    const PROXY_URL = "https://m3u-cors-proxy.lmarion44.workers.dev/?url=";
+
+function proxiedUrl(url) {
+  return PROXY_URL + encodeURIComponent(url);
+}
+
+    const btnLoad = document.getElementById('btn-load');
+    const m3uUrlInput = document.getElementById('m3u-url');
+    const m3uFileInput = document.getElementById('m3u-file');
+    const errorMessage = document.getElementById('error-message');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const dashboardView = document.getElementById('dashboard-view');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const loadedSourceName = document.getElementById('loaded-source-name');
+    
+    const metricTotal = document.getElementById('metric-total');
+    const metricLive = document.getElementById('metric-live');
+    const metricVod = document.getElementById('metric-vod');
+    const metricGroups = document.getElementById('metric-groups');
+
+    const searchInput = document.getElementById('search-input');
+    const groupFilter = document.getElementById('group-filter');
+    const channelsTbody = document.getElementById('channels-tbody');
+
+    const btnCheckAll = document.getElementById('btn-check-all');
+    const checkerUi = document.getElementById('checker-ui');
+    const checkerProgressBar = document.getElementById('checker-progress-bar');
+    const checkerStatusText = document.getElementById('checker-status-text');
+    const btnCancelCheck = document.getElementById('btn-cancel-check');
+    const countOkEl = document.getElementById('count-ok');
+    const countNokEl = document.getElementById('count-nok');
+    const countCorsEl = document.getElementById('count-cors');
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    btnLoad.addEventListener('click', loadFromUrl);
+    m3uFileInput.addEventListener('change', loadFromLocalFile);
+    searchInput.addEventListener('input', renderTable);
+    groupFilter.addEventListener('change', renderTable);
+    btnCheckAll.addEventListener('click', checkAllChannels);
+    btnCancelCheck.addEventListener('click', () => { activeCheckingBatch = false; });
+
+ async function loadFromUrl() {
+  const url = m3uUrlInput.value.trim();
+
+  if (!url) {
+    showError("Veuillez entrer une adresse URL valide.");
+    return;
+  }
+
+  try {
+    new URL(url);
+  } catch {
+    showError("NOK - L'adresse URL n'est pas valide.");
+    return;
+  }
+
+  resetUI();
+  loadingSpinner.classList.add('show');
+
+  try {
+    // Essai direct
+    let response = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store'
+    }).catch(() => null);
+
+    // Si CORS bloque Safari → Worker Cloudflare
+    if (!response || !response.ok) {
+      response = await fetch(proxiedUrl(url), {
+        method: 'GET',
+        cache: 'no-store'
+      }).catch(() => null);
+    }
+
+    if (!response || !response.ok) {
+      throw new Error(
+        "NOK - Impossible de récupérer la playlist."
+      );
+    }
+
+    const data = await response.text();
+
+    if (!data.includes("#EXTM3U")) {
+      throw new Error(
+        "NOK - La réponse reçue n'est pas une playlist M3U valide."
+      );
+    }
+
+    parseM3U(data, url);
+
+  } catch (err) {
+    showError(
+      err.message ||
+      "NOK - Une erreur réseau est survenue."
+    );
+  }
+}
+
+    function loadFromLocalFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      resetUI();
+      loadingSpinner.classList.add('show');
+
+      const reader = new FileReader();
+      reader.onload = function(evt) { parseM3U(evt.target.result, file.name); };
+      reader.onerror = function() { showError("NOK - Impossible de lire ce fichier local."); };
+      reader.readAsText(file);
+    }
+
+    function parseM3U(text, sourceName) {
+      if (!text.includes("#EXTM3U")) {
+        showError("NOK - Structure M3U non valide (balise #EXTM3U manquante).");
+        return;
+      }
+
+      channelsData = [];
+      const lines = text.split(/\r?\n/);
+      let currentMetadata = null;
+      const groupsSet = new Set();
+
+for (let i = 0; i < lines.length; i++) {const line = lines[i].trim();if (line.startsWith("#EXTINF:")) {
+          
+          // 1. EXTRACTION PAR POSITION (Garantit le support des étoiles ★☆★ sans Regex)
+          let extractedName = "";
+          const tvgNameKey = 'tvg-name="';
+          const nameStartIdx = line.indexOf(tvgNameKey);
+          
+          if (nameStartIdx !== -1) {
+            const startQuote = nameStartIdx + tvgNameKey.length;
+            const endQuote = line.indexOf('"', startQuote);
+            if (endQuote !== -1) {
+              // CORRECTIF ICI : On applique le .trim() sur la sous-chaîne isolée
+              extractedName = line.substring(startQuote, endQuote).trim();
+            }
+          }
+          
+          // Secours si tvg-name est vide ou introuvable
+          if (!extractedName) {
+            const lastCommaIdx = line.lastIndexOf(',');
+            if (lastCommaIdx !== -1 && lastCommaIdx < line.length - 1) {
+              extractedName = line.substring(lastCommaIdx + 1).trim();
+            } else {
+              extractedName = "Flux Sans Nom";
+            }
+          }
+
+          // 2. Extraction de la catégorie group-title="" par position de guillemets
+          let extractedGroup = "Général";
+          const groupKey = 'group-title="';
+          const groupStartIdx = line.indexOf(groupKey);
+          if (groupStartIdx !== -1) {
+            const startQuoteG = groupStartIdx + groupKey.length;
+            const endQuoteG = line.indexOf('"', startQuoteG);
+            if (endQuoteG !== -1) {
+              extractedGroup = line.substring(startQuoteG, endQuoteG).trim();
+            }
+          }
+
+          currentMetadata = {
+            id: channelsData.length,
+            name: extractedName,
+            group: extractedGroup,
+            url: "",
+            status: "pending"
+          };
+          groupsSet.add(extractedGroup);
+        } else if (line && !line.startsWith("#") && currentMetadata) {
+          currentMetadata.url = line;
+          channelsData.push(currentMetadata);
+          currentMetadata = null;
+        }
+      }
+
+      if (channelsData.length === 0) {
+        showError("NOK - Aucune chaîne de flux valide n'a pu être extraite.");
+        return;
+      }
+
+      let liveCount = 0, vodCount = 0;
+      channelsData.forEach(c => {
+        const u = c.url.toLowerCase();
+        if (u.includes(".mp4") || u.includes(".mkv") || u.includes(".avi")) vodCount++; else liveCount++;
+      });
+
+      loadingSpinner.classList.remove('show');
+      loadedSourceName.textContent = sourceName;
+      metricTotal.textContent = channelsData.length;
+      metricLive.textContent = liveCount;
+      metricVod.textContent = vodCount;
+      metricGroups.textContent = groupsSet.size;
+
+      groupFilter.innerHTML = '<option value="">Toutes les catégories</option>';
+      Array.from(groupsSet).sort().forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g; opt.textContent = g; groupFilter.appendChild(opt);
+      });
+
+      statusDot.classList.add('active');
+      statusText.textContent = "Playlist active";
+      dashboardView.classList.add('show');
+      renderTable();
+    }
+
+    function renderTable() {
+      const sTerm = searchInput.value.toLowerCase();
+      const gTerm = groupFilter.value;
+      channelsTbody.innerHTML = "";
+
+      const filtered = channelsData.filter(c => {
+        const matchSearch = c.name.toLowerCase().includes(sTerm);
+        const matchGroup = !gTerm || c.group === gTerm;
+        return matchSearch && matchGroup;
+      });
+
+      const chunk = filtered.slice(0, 200);
+      chunk.forEach(c => {
+        let stBadge = `<span class="status-badge pending" id="badge-${c.id}">En attente</span>`;
+        if (c.status === 'ok') stBadge = `<span class="status-badge ok" id="badge-${c.id}">🟢 En ligne</span>`;
+        if (c.status === 'nok') stBadge = `<span class="status-badge nok" id="badge-${c.id}">🔴 NOK</span>`;
+        if (c.status === 'cors') stBadge = `<span class="status-badge cors" id="badge-${c.id}">🟡 CORS</span>`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight:700;">${escapeHtml(c.name)}</td>
+          <td><span style="color:var(--muted); font-size:12px;">${escapeHtml(c.group)}</span></td>
+          <td>${stBadge}</td>
+          <td style="text-align:right;">
+            <button class="action-btn" onclick="checkSingleChannel(${c.id})">Vérifier</button>
+          </td>
+        `;
+        channelsTbody.appendChild(tr);
+      });
+    }
+
+
+    async function checkSingleChannel(id) {
+      const channel = channelsData.find(c => c.id === id);
+      if (!channel) return;
+      updateRowStatus(id, 'pending');
+
+      const result = await verifyUrlNetwork(channel.url);
+      channel.status = result;
+      updateRowStatus(id, result);
+    }
+
+async function verifyUrlNetwork(url) {
+
+  // Essai direct
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+
+    if (res.ok) {
+      return 'ok';
+    }
+  } catch {
+    // CORS / erreur réseau → proxy
+  }
+
+  // Essai via notre Worker Cloudflare
+  try {
+    const proxyRes = await fetch(proxiedUrl(url), {
+      method: 'GET',
+      cache: 'no-store'
+    });
+
+    if (proxyRes.ok) {
+      return 'ok';
+    }
+
+    if (
+      proxyRes.status === 401 ||
+      proxyRes.status === 403
+    ) {
+      return 'nok';
+    }
+
+  } catch {
+    // Rien
+  }
+
+  return 'nok';
+}
+
+    function updateRowStatus(id, status) {
+      const badge = document.getElementById(`badge-${id}`);
+      if (!badge) return;
+      badge.className = `status-badge ${status}`;
+      if (status === 'pending') badge.textContent = "Vérification...";
+      if (status === 'ok') badge.textContent = "🟢 En ligne";
+      if (status === 'nok') badge.textContent = "🔴 NOK";
+      if (status === 'cors') badge.textContent = "🟡 CORS";
+    }
+
+    async function checkAllChannels() {
+      if (activeCheckingBatch) return;
+      activeCheckingBatch = true;
+      checkerUi.classList.add('show');
+      
+      let processed = 0;
+      let ok = 0, nok = 0, cors = 0;
+      const total = channelsData.length;
+
+      countOkEl.textContent = "0"; countNokEl.textContent = "0"; countCorsEl.textContent = "0";
+      
+      const batchSize = 5;
+      for (let i = 0; i < total; i += batchSize) {
+        if (!activeCheckingBatch) break;
+
+        const chunk = channelsData.slice(i, i + batchSize);
+        const promises = chunk.map(async (channel) => {
+          updateRowStatus(channel.id, 'pending');
+          const res = await verifyUrlNetwork(channel.url);
+          channel.status = res;
+          updateRowStatus(channel.id, res);
+          
+          if (res === 'ok') ok++;
+          else if (res === 'cors') cors++;
+          else nok++;
+        });
+
+        await Promise.all(promises);
+        processed += chunk.length;
+
+        const pct = (processed / total) * 100;
+        checkerProgressBar.style.width = `${pct}%`;
+        checkerStatusText.textContent = `Vérification : ${processed} / ${total} éléments analysés`;
+        countOkEl.textContent = ok;
+        countNokEl.textContent = nok;
+        countCorsEl.textContent = cors;
+      }
+
+      activeCheckingBatch = false;
+      checkerStatusText.textContent = processed === total ? "Analyse terminée !" : "Analyse interrompue.";
+    }
+
+    function showError(msg) {
+      loadingSpinner.classList.remove('show');
+      errorMessage.textContent = msg;
+      errorMessage.classList.add('show');
+    }
+
+    function resetUI() {
+      errorMessage.classList.remove('show');
+      dashboardView.classList.remove('show');
+      loadingSpinner.classList.remove('show');
+      checkerUi.classList.remove('show');
+      statusDot.classList.remove('active');
+      statusText.textContent = "Aucun fichier chargé";
+      activeCheckingBatch = false;
+    }
+  </script>
+</body>
+</html>
