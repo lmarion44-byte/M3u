@@ -630,7 +630,7 @@ td {
     </div>
 
     <div class="counter cors">
-      🟡 Accessible/protégé :
+      🟡 Accès refusé :
       <span id="count-cors">0</span>
     </div>
 
@@ -1047,50 +1047,18 @@ async function loadFromUrl() {
 
   try {
 
-    let response;
-
     /*
-     * Tentative directe
+     * Toujours charger la playlist via le backend.
+     * Cela évite le fetch direct HTTP depuis GitHub Pages (HTTPS),
+     * qui peut être bloqué comme mixed content avant même CORS.
      */
-
-    try {
-
-      response =
-        await fetch(
-          url,
-          {
-            method: "GET",
-            cache: "no-store"
-          }
-        );
-
-    } catch (error) {
-
-      response = null;
-
-    }
-
-
-    /*
-     * Si CORS bloqué :
-     * passage par Cloudflare
-     */
-
-    if (
-      !response ||
-      !response.ok
-    ) {
-
-      response =
-        await fetch(
-          proxiedUrl(url),
-          {
-            method: "GET",
-            cache: "no-store"
-          }
-        );
-
-    }
+    const response = await fetch(
+      proxiedUrl(url),
+      {
+        method: "GET",
+        cache: "no-store"
+      }
+    );
 
 
     if (!response.ok) {
@@ -1460,7 +1428,7 @@ function renderTable() {
 
         statusHtml =
           `<span class="status cors">
-             🟡 Accessible/protégé
+             🟡 Accès refusé
            </span>`;
 
       } else {
@@ -2202,6 +2170,7 @@ urlInput.addEventListener(
       event.key === "Enter"
     ) {
 
+      event.preventDefault();
       loadFromUrl();
 
     }
